@@ -1,0 +1,18 @@
+Smooth Portraits @VERSION@
+for Kerbal Space Program 1.12.x
+
+The crew's portraits at the bottom right of the flight screen, drawn as often as the game itself instead of seven to ten times a second.
+
+INSTALL
+  Copy both folders in this download's GameData (Keystone and SmoothPortraits) into your KSP's
+  GameData folder, and start the game. Keystone is the base this mod stands on; one copy
+  serves every mod that uses it. To remove the mod, delete the SmoothPortraits folder.
+
+USE
+  Open the Keystone window: the keystone button on the game's toolbar, or Option-K on a
+  Mac and Alt-K elsewhere. Then turn to Smooth Portraits (it is on as installed).
+
+WHERE IT WORKS
+  Made and tried on a Mac. Nobody has run it on Windows or Linux yet.
+
+Everything else: https://github.com/IshiakiZ/ksp-smooth-portraits
