@@ -36,10 +36,10 @@ Drag a slider, or type a number into the box beside it.
 * Made and tried on a Mac. It is plain C# with no shader or library of its own, so it should work on
   Windows and Linux as well, but it has **not been run** there.
 
-More: [how it works](docs/How-it-works.md),
-[what it costs, as measured](docs/What-it-costs.md),
-[limits](docs/Limits.md),
-[building it yourself](docs/Building.md).
+More: [how it works](https://github.com/IshiakiZ/ksp-smooth-portraits/wiki/How-it-works),
+[what it costs, as measured](https://github.com/IshiakiZ/ksp-smooth-portraits/wiki/What-it-costs),
+[limits](https://github.com/IshiakiZ/ksp-smooth-portraits/wiki/Limits),
+[building it yourself](https://github.com/IshiakiZ/ksp-smooth-portraits/wiki/Building).
 
 ## Licence
 
