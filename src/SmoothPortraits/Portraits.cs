@@ -8,7 +8,7 @@ using UnityEngine;
 
 #if !DEV
 [assembly: KSPAssembly("SmoothPortraits", 0, 1)]
-[assembly: KSPAssemblyDependency("Keystone", 0, 1)]
+[assembly: KSPAssemblyDependency("Keystone", 0, 4)]
 #endif
 
 namespace SmoothPortraits
@@ -40,7 +40,7 @@ namespace SmoothPortraits
     [KSPAddon(KSPAddon.Startup.Flight, false)]
     public sealed class Portraits : MonoBehaviour
     {
-        public const string Version = "0.1.0";
+        public const string Version = "0.1.1";
 
         static Mod mod;
         static Toggle on, outside;

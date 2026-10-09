@@ -29,9 +29,12 @@ case "$MODE" in
   dist|install)
     mkdir -p "$OUT"
     WITH="$KEYSTONE" compile "$OUT/SmoothPortraits.dll" "" src/SmoothPortraits
+    # (the mod's own shaders, if it has any: made by tools/shaderpack/make_bundle.py and kept ready made in src/SmoothPortraits/Shaders)
+    if ls src/SmoothPortraits/Shaders/*.bundle >/dev/null 2>&1; then mkdir -p "$OUT/PluginData"; cp src/SmoothPortraits/Shaders/*.bundle "$OUT/PluginData/"; fi
     if [ "$MODE" = dist ]; then echo "ok: built into $OUT"; exit 0; fi
     mkdir -p "$KSP_DIR/GameData/SmoothPortraits"
     cp "$OUT/SmoothPortraits.dll" "$KSP_DIR/GameData/SmoothPortraits/"
+    if [ -d "$OUT/PluginData" ]; then mkdir -p "$KSP_DIR/GameData/SmoothPortraits/PluginData"; cp "$OUT/PluginData"/*.bundle "$KSP_DIR/GameData/SmoothPortraits/PluginData/"; fi
     echo "ok: Smooth Portraits installed to $KSP_DIR/GameData/SmoothPortraits (restart KSP to load it; it needs Keystone there too)"
     ;;
   *)
