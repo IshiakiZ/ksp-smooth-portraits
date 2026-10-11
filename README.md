@@ -33,8 +33,14 @@ Drag a slider, or type a number into the box beside it.
 * **What it costs:** about 0.2 ms a frame for one portrait at 60 pictures a second (1.5% at 80 frames a
   second), and never more than the share you set: where that does not pay for every portrait in every
   frame, the portraits take turns.
-* Made and tried on a Mac. It is plain C# with no shader or library of its own, so it should work on
-  Windows and Linux as well, but it has **not been run** there.
+
+## Where it works
+
+| System | |
+| --- | --- |
+| Mac | Made and tried here. |
+| Windows | Tried on Windows 11 (KSP 1.12.5): one portrait at 60 pictures a second, 0.13 ms a frame, by the mod's own report on its page. |
+| Linux | **Never run.** It is plain C# with no shader or library of its own. |
 
 More: [how it works](https://github.com/IshiakiZ/ksp-smooth-portraits/wiki/How-it-works),
 [what it costs, as measured](https://github.com/IshiakiZ/ksp-smooth-portraits/wiki/What-it-costs),
