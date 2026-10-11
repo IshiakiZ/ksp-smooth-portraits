@@ -11,7 +11,7 @@ For Kerbal Space Program 1.12.x. Needs [Keystone](https://github.com/IshiakiZ/ks
 
 ## Install
 
-Copy the `Keystone` and `SmoothPortraits` folders from the download's `GameData` into your KSP `GameData`.
+Copy the `Keystone` and `SmoothPortraits` folders from the download into your KSP `GameData`.
 It is on as installed.
 
 ## Settings
