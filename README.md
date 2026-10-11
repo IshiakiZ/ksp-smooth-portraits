@@ -7,6 +7,8 @@ game runs, which is why the faces jerk. This mod has the pictures taken as often
 up to a limit you set. Nothing about a picture is changed: each is taken by the game's own code with the
 same camera at the same size.
 
+![The crew's portraits at lift-off: the game's own on the left, with Smooth Portraits on the right](src/SmoothPortraits/img/smooth-portraits.gif)
+
 For Kerbal Space Program 1.12.x. Needs [Keystone](https://github.com/IshiakiZ/ksp-keystone), which comes in the download.
 
 ## Install
@@ -49,4 +51,4 @@ More: [how it works](https://github.com/IshiakiZ/ksp-smooth-portraits/wiki/How-i
 
 ## Licence
 
-[MIT](LICENSE).
+[CC BY 4.0](LICENSE): use it, change it and pass it on as you like, as long as you credit Ishiaki and link back here.
