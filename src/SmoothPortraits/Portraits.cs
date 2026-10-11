@@ -40,7 +40,7 @@ namespace SmoothPortraits
     [KSPAddon(KSPAddon.Startup.Flight, false)]
     public sealed class Portraits : MonoBehaviour
     {
-        public const string Version = "0.1.1";
+        public const string Version = "0.1.2";
 
         static Mod mod;
         static Toggle on, outside;
