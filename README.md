@@ -1,54 +1,35 @@
 # Smooth Portraits
 
-The crew's portraits at the bottom right of the flight screen, drawn as often as the game itself.
-
-The game lets each portrait's camera take a picture only seven to ten times a second, however fast the
-game runs, which is why the faces jerk. This mod has the pictures taken as often as the screen is redrawn,
-up to a limit you set. Nothing about a picture is changed: each is taken by the game's own code with the
-same camera at the same size.
+The crew's portraits at the bottom right of the flight screen, drawn as often as the game itself. The game redraws
+them only seven to ten times a second, which is why the faces jerk. Nothing else about the picture is changed.
 
 ![The crew's portraits at lift-off: the game's own on the left, with Smooth Portraits on the right](src/SmoothPortraits/img/smooth-portraits.gif)
 
-For Kerbal Space Program 1.12.x. Needs [Keystone](https://github.com/IshiakiZ/ksp-keystone), a separate download ([its page on SpaceDock](https://spacedock.info/mod/4665/Keystone)): this mod does not load without it.
+For Kerbal Space Program 1.12.x. **Needs [Keystone](https://github.com/IshiakiZ/ksp-keystone)**, a separate download
+([on SpaceDock](https://spacedock.info/mod/4665/Keystone)): this mod does not load without it.
 
 ## Install
 
-Install [Keystone](https://github.com/IshiakiZ/ksp-keystone) first: it is a download of its own, and its `Keystone` folder goes into your KSP
-`GameData`. Then copy the `SmoothPortraits` folder from this mod's download into `GameData` beside it.
-It is on as installed.
+Copy the `SmoothPortraits` folder from the download into your KSP's `GameData`, beside `Keystone`. It is on as
+installed.
 
 ## Settings
 
-In the Keystone window (the keystone button on the game's toolbar, or Option-K on a Mac, Alt-K elsewhere).
-Drag a slider, or type a number into the box beside it.
-
-![The mod's page](src/SmoothPortraits/img/portraits-page.jpg)
-
-| Setting | Installed as | |
-| --- | --- | --- |
-| Smooth portraits | on | off: the game draws the portraits itself again |
-| At most | 60 a second | the most pictures each portrait gets in a second |
-| Share of a frame | 3 % | the most of each frame's time the portraits may take |
-| Kerbals outside too | on | off leaves the portraits of kerbals outside the ship to the game |
+In the Keystone window (the keystone button on the game's toolbar, or Alt-K; Option-K on a Mac): the most pictures a
+second (60 as installed), the most of each frame's time the portraits may take (3 %), and whether kerbals outside
+the ship are included.
 
 ## Good to know
 
-* **What it costs:** about 0.2 ms a frame for one portrait at 60 pictures a second (1.5% at 80 frames a
-  second), and never more than the share you set: where that does not pay for every portrait in every
-  frame, the portraits take turns.
+* It costs about 0.2 ms a frame for one portrait at 60 pictures a second, and never more than the share you set:
+  where that does not pay for every portrait in every frame, the portraits take turns.
 
-## Where it works
+## Works on
 
-| System | |
-| --- | --- |
-| Mac | Made and tried here. |
-| Windows | Tried on Windows 11 (KSP 1.12.5): one portrait at 60 pictures a second, 0.13 ms a frame, by the mod's own report on its page. |
-| Linux | **Never run.** It is plain C# with no shader or library of its own. |
+Windows 11 and Mac: tried. Linux: never run (it is plain C#, with nothing of one system's in it).
 
-More: [how it works](https://github.com/IshiakiZ/ksp-smooth-portraits/wiki/How-it-works),
-[what it costs, as measured](https://github.com/IshiakiZ/ksp-smooth-portraits/wiki/What-it-costs),
-[limits](https://github.com/IshiakiZ/ksp-smooth-portraits/wiki/Limits),
-[building it yourself](https://github.com/IshiakiZ/ksp-smooth-portraits/wiki/Building).
+**More:** [the long description](https://github.com/IshiakiZ/ksp-smooth-portraits/wiki/The-long-description) (everything in full, and
+what was tried on each system) and the rest of the [wiki](https://github.com/IshiakiZ/ksp-smooth-portraits/wiki).
 
 ## Licence
 
