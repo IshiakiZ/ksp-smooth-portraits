@@ -9,11 +9,12 @@ same camera at the same size.
 
 ![The crew's portraits at lift-off: the game's own on the left, with Smooth Portraits on the right](src/SmoothPortraits/img/smooth-portraits.gif)
 
-For Kerbal Space Program 1.12.x. Needs [Keystone](https://github.com/IshiakiZ/ksp-keystone), which comes in the download.
+For Kerbal Space Program 1.12.x. Needs [Keystone](https://github.com/IshiakiZ/ksp-keystone), a separate download ([its page on SpaceDock](https://spacedock.info/mod/4665/Keystone)): this mod does not load without it.
 
 ## Install
 
-Copy the `Keystone` and `SmoothPortraits` folders from the download into your KSP `GameData`.
+Install [Keystone](https://github.com/IshiakiZ/ksp-keystone) first: it is a download of its own, and its `Keystone` folder goes into your KSP
+`GameData`. Then copy the `SmoothPortraits` folder from this mod's download into `GameData` beside it.
 It is on as installed.
 
 ## Settings
