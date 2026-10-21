@@ -40,27 +40,28 @@ namespace SmoothPortraits
     [KSPAddon(KSPAddon.Startup.Flight, false)]
     public sealed class Portraits : MonoBehaviour
     {
-        public const string Version = "0.1.2";
+        public const string Version = "0.2.0";
 
         static Mod mod;
-        static Toggle on, outside;
+        static Toggle on, outside, sharp, ride;
         static Slider most, share;
 
         // The game's own, which it keeps to itself (see Keystone.Reach).
         static bool looked;
-        static FieldInfo crewList, seen, seenOutside, yields, yieldsOutside;
+        static FieldInfo crewList, seen, seenOutside, timer, timerOutside;
+        static MethodInfo cycle, cycleOutside;
         static Action<Kerbal> draw;
         static Action<Kerbal, Camera> drawFromSeat;
 
-        readonly WaitForSeconds standBack = new WaitForSeconds(2f);      // what the game's own timers are given to wait on while this draws for them
         readonly List<Kerbal> inside = new List<Kerbal>();
         readonly List<KerbalEVA> out_ = new List<KerbalEVA>();
-        readonly HashSet<Kerbal> held = new HashSet<Kerbal>();
-        readonly HashSet<KerbalEVA> heldOutside = new HashSet<KerbalEVA>();
+        readonly Dictionary<Kerbal, float> held = new Dictionary<Kerbal, float>();                 // each portrait this draws, and when it last drew it
+        readonly Dictionary<KerbalEVA, float> heldOutside = new Dictionary<KerbalEVA, float>();
         float credit, creditOutside;
         int turn, turnOutside;
         double costInside = 0.0003, costOutside = 0.003;                   // seconds a picture, as measured (a first guess until then)
         float nextLook;
+        int givenBack;                                                     // (times a portrait's own timer was given back to the game while held: for the readout)
 
         // what it has been doing lately, for the window
         float tallyFrom;
@@ -78,6 +79,8 @@ namespace SmoothPortraits
                 most = mod.Slider("most", "At most", 60f, 10f, 144f, " a second", 0, "The most pictures each portrait gets in a second. No more are ever taken than the game draws frames.");
                 share = mod.Slider("share", "Share of a frame", 3f, 0.5f, 15f, " %", 1, "How much of each frame's time the portraits may take. Where that is not enough for all of them in every frame, they take turns.");
                 outside = mod.Toggle("outside", "Kerbals outside too", true, "The portrait of a kerbal outside the ship is the whole scene drawn again from their helmet: far dearer. Off leaves those to the game.");
+                ride = mod.Toggle("ride", "Shaken by the ride", true, "The crew's heads move in their portraits as the ride moves them, as in film from real cockpits: pressed back under thrust and nodding forward when it stops, swaying in turns, buzzing with solid boosters, the air's buffeting near the speed of sound and rough ground. The game moves only their faces. Off: as the game draws them.");
+                sharp = mod.Toggle("sharp", "Smooth edges", true, "The portraits drawn with their edges smoothed (four samples a point), and a kerbal outside the ship in full colour (the game draws those in sixteen-bit colour, which bands): a little more of the graphics card's time for each picture. Off: as the game draws them.");
             }
         }
 
@@ -90,18 +93,42 @@ namespace SmoothPortraits
                 looked = true;
                 crewList = Reach.Field(typeof(KerbalPortraitGallery), "portraits");
                 seen = Reach.Field(typeof(Kerbal), "visibleInPortrait");
-                yields = Reach.Field(typeof(Kerbal), "updIntervalYield");
+                timer = Reach.Field(typeof(Kerbal), "updateCoroutine");
+                cycle = Reach.Method(typeof(Kerbal), "kerbalAvatarUpdateCycle");
                 seenOutside = Reach.Field(typeof(KerbalEVA), "visibleInPortrait");
-                yieldsOutside = Reach.Field(typeof(KerbalEVA), "updIntervalYield");
+                timerOutside = Reach.Field(typeof(KerbalEVA), "updateAvatarCoroutine");
+                cycleOutside = Reach.Method(typeof(KerbalEVA), "kerbalAvatarUpdateCycle");
                 draw = Reach.Call<Action<Kerbal>>(typeof(Kerbal), "kerbalAvatarUpdate");
                 drawFromSeat = Reach.Call<Action<Kerbal, Camera>>(typeof(Kerbal), "kerbalSeatCamUpdate", typeof(Camera));
             }
         }
 
-        bool Able => crewList != null && seen != null && yields != null && draw != null && drawFromSeat != null;
+        bool Able => crewList != null && seen != null && timer != null && cycle != null && draw != null && drawFromSeat != null;
+        static bool AbleOutside => seenOutside != null && timerOutside != null && cycleOutside != null;
+
+        /// <summary>
+        /// (Since 0.2.0.) The game's own timer for a portrait (a coroutine the kerbal keeps, taking a picture every 0.10 to 0.15 s)
+        /// stopped, as the game itself stops it while a portrait is hidden: it takes no pictures while this mod draws the portrait.
+        /// (Until 0.2.0 it was only told to wait two seconds between pictures, and still took one of each every two seconds, in the
+        /// middle of a frame, the same as one the mod had just taken.)
+        /// </summary>
+        static void Halt(MonoBehaviour kerbal, FieldInfo running)
+        {
+            if (running.GetValue(kerbal) is Coroutine c) { kerbal.StopCoroutine(c); running.SetValue(kerbal, null); }
+        }
+
+        /// <summary>The game's own timer for a portrait going again, as the game starts it when a portrait comes into view: if it is not going, and the portrait is showing.</summary>
+        static bool Resume(MonoBehaviour kerbal, FieldInfo running, MethodInfo cycleOf, FieldInfo showing)
+        {
+            if (kerbal == null || !kerbal.isActiveAndEnabled || running.GetValue(kerbal) != null || !(bool)showing.GetValue(kerbal)) return false;
+            if (!(cycleOf.Invoke(kerbal, null) is System.Collections.IEnumerator e)) return false;
+            running.SetValue(kerbal, kerbal.StartCoroutine(e));
+            return true;
+        }
 
         void OnDestroy()
         {
+            Ride.Upright();
             LetGo();
             if (mod != null && mod.Panel == Readout) mod.Panel = null;
         }
@@ -109,11 +136,9 @@ namespace SmoothPortraits
         /// <summary>Hand every portrait back to the game's own timer.</summary>
         void LetGo()
         {
-            foreach (Kerbal kerbal in held)
-                if (kerbal != null) yields.SetValue(kerbal, new WaitForSeconds(kerbal.updateInterval > 0f ? kerbal.updateInterval : 0.12f));
+            foreach (Kerbal kerbal in held.Keys) if (kerbal != null) Resume(kerbal, timer, cycle, seen);
             held.Clear();
-            foreach (KerbalEVA kerbal in heldOutside)
-                if (kerbal != null) yieldsOutside.SetValue(kerbal, new WaitForSeconds(kerbal.KerbalAvatarUpdateInterval > 0f ? kerbal.KerbalAvatarUpdateInterval : 0.12f));
+            if (AbleOutside) foreach (KerbalEVA walker in heldOutside.Keys) if (walker != null) Resume(walker, timerOutside, cycleOutside, seenOutside);
             heldOutside.Clear();
         }
 
@@ -124,10 +149,13 @@ namespace SmoothPortraits
             KerbalPortraitGallery gallery = KerbalPortraitGallery.Instance;
             if (gallery == null || !gallery.isActiveAndEnabled) return;
 
-            // Whose portraits are showing. (Looked up a few times a second; which seats are showing changes rarely.)
+            // Whose portraits are showing. (Looked up a few times a second; which seats are showing changes rarely.) Each one this
+            // draws has the game's own timer stopped, and started again should this not have drawn it for a second (its share
+            // spent on the others for long, or anything gone wrong): the game takes its own pictures of it again until this does.
             if (Time.unscaledTime >= nextLook)
             {
-                nextLook = Time.unscaledTime + 0.25f;
+                float now = Time.unscaledTime;
+                nextLook = now + 0.25f;
                 inside.Clear();
                 out_.Clear();
                 var crew = crewList.GetValue(gallery) as List<KerbalPortrait>;
@@ -139,26 +167,47 @@ namespace SmoothPortraits
                         if (kerbal != null && kerbal.isActiveAndEnabled && (bool)seen.GetValue(kerbal))
                         {
                             inside.Add(kerbal);
-                            if (held.Add(kerbal)) yields.SetValue(kerbal, standBack);
+                            if (!held.TryGetValue(kerbal, out float drawn)) held[kerbal] = drawn = now;
+                            if (now - drawn < 1f) Halt(kerbal, timer);
+                            else if (Resume(kerbal, timer, cycle, seen)) givenBack++;
                             continue;
                         }
                         KerbalEVA walker = crew[n].crewEVAMember;
-                        if (walker == null || !outside.Value || seenOutside == null || yieldsOutside == null) continue;
+                        if (walker == null || !outside.Value || !AbleOutside) continue;
                         if (!walker.isActiveAndEnabled || !(bool)seenOutside.GetValue(walker) || walker.vessel != FlightGlobals.ActiveVessel || walker.kerbalPortraitCamera == null) continue;
                         out_.Add(walker);
-                        if (heldOutside.Add(walker)) yieldsOutside.SetValue(walker, standBack);
+                        if (!heldOutside.TryGetValue(walker, out float drawnOutside)) heldOutside[walker] = drawnOutside = now;
+                        if (now - drawnOutside < 1f) Halt(walker, timerOutside);
+                        else if (Resume(walker, timerOutside, cycleOutside, seenOutside)) givenBack++;
                     }
                 if (!outside.Value && heldOutside.Count > 0)
                 {
-                    foreach (KerbalEVA walker in heldOutside)
-                        if (walker != null) yieldsOutside.SetValue(walker, new WaitForSeconds(walker.KerbalAvatarUpdateInterval > 0f ? walker.KerbalAvatarUpdateInterval : 0.12f));
+                    foreach (KerbalEVA walker in heldOutside.Keys) if (walker != null) Resume(walker, timerOutside, cycleOutside, seenOutside);
                     heldOutside.Clear();
                 }
-                held.RemoveWhere(k => k == null);
-                heldOutside.RemoveWhere(k => k == null);
+                // (gone from view: the game stopped its timer itself, and starts it when the portrait shows again, which this then stops)
+                if (held.Count > inside.Count) foreach (Kerbal gone in new List<Kerbal>(held.Keys)) if (gone == null || !inside.Contains(gone)) held.Remove(gone);
+                if (heldOutside.Count > out_.Count) foreach (KerbalEVA gone in new List<KerbalEVA>(heldOutside.Keys)) if (gone == null || !out_.Contains(gone)) heldOutside.Remove(gone);
+#if DEV
+                theirs.Clear();
+                foreach (Kerbal k in held.Keys) { Camera c = k.protoCrewMember != null && k.protoCrewMember.seat != null && k.protoCrewMember.seat.portraitCamera != null ? k.protoCrewMember.seat.portraitCamera : k.kerbalCam; if (c != null) theirs.Add(c); }
+                foreach (KerbalEVA k in heldOutside.Keys) if (k.kerbalPortraitCamera != null) theirs.Add(k.kerbalPortraitCamera);
+                if (!counting) { Camera.onPreRender += Counted; counting = true; }
+#endif
             }
             if (inside.Count == 0 && out_.Count == 0) report = "no portraits showing";
+            // (the heads leant by the ride here, after the faces' animation and before Unity makes their skin for this frame, and put
+            // back at its end: see Ride)
+            if (ride.Value && inside.Count > 0) { Ride.Step(inside, Time.deltaTime); Ride.TurnHeads(inside); }
         }
+
+#if DEV
+        // (for the development build: pictures of the portraits this holds taken by anything but this mod, the game's own timer above all)
+        static readonly HashSet<Camera> theirs = new HashSet<Camera>();
+        static bool counting, ours;
+        static int othersTook;
+        static void Counted(Camera cam) { if (!ours && cam != null && theirs.Contains(cam)) othersTook++; }
+#endif
 
         /// <summary>
         /// The pictures are taken when the frame is finished and on the screen: everything in the scene has been
@@ -174,6 +223,7 @@ namespace SmoothPortraits
                 yield return finished;
                 try { Pictures(); }
                 catch (Exception ex) { Kit.Log("Smooth Portraits", "stopped for this frame: " + ex.Message); }
+                finally { Ride.Upright(); }
             }
         }
 
@@ -183,7 +233,7 @@ namespace SmoothPortraits
             KerbalPortraitGallery gallery = KerbalPortraitGallery.Instance;
             if (gallery == null || !gallery.isActiveAndEnabled) return;
 #if DEV
-            if (probing) return;
+            if (probing || testNone) return;
 #endif
             // How many pictures this frame may take: as many as the rate asks for, and no more than its share of the frame pays for.
             float frame = Mathf.Clamp(Time.unscaledDeltaTime, 0.002f, 0.1f);
@@ -215,8 +265,35 @@ namespace SmoothPortraits
 
         void Start()
         {
-            drawInside = n => Draw(inside[n]);
-            drawOutside = n => Draw(out_[n]);
+            drawInside = n =>
+            {
+                Kerbal kerbal = inside[n];
+                bool shaken = ride.Value;
+                if (shaken) Ride.ShakeCamera(kerbal);
+#if DEV
+                ours = true;
+#endif
+                try { Draw(kerbal); }
+                finally
+                {
+                    if (shaken) Ride.StillCamera(kerbal);
+#if DEV
+                    ours = false;
+#endif
+                }
+                if (held.ContainsKey(kerbal)) held[kerbal] = Time.unscaledTime;
+            };
+            drawOutside = n =>
+            {
+                KerbalEVA walker = out_[n];
+#if DEV
+                ours = true;
+                try { Draw(walker); } finally { ours = false; }
+#else
+                Draw(walker);
+#endif
+                if (heldOutside.ContainsKey(walker)) heldOutside[walker] = Time.unscaledTime;
+            };
             StartCoroutine(AfterEachFrame());
         }
 
@@ -257,6 +334,7 @@ namespace SmoothPortraits
         static void Draw(Kerbal kerbal)
         {
             if (kerbal == null || !kerbal.isActiveAndEnabled) return;
+            Sharpen(kerbal.avatarTexture);
             ProtoCrewMember member = kerbal.protoCrewMember;
             if (member != null && member.seat != null && member.seat.portraitCamera != null) drawFromSeat(kerbal, member.seat.portraitCamera);
             else draw(kerbal);
@@ -267,6 +345,7 @@ namespace SmoothPortraits
         {
             if (kerbal == null || !kerbal.isActiveAndEnabled || kerbal.kerbalPortraitCamera == null) return;
             RenderTexture picture = kerbal.AvatarTexture;
+            Sharpen(picture);
             RenderTexture.active = picture;
             Shoot(kerbal.kerbalCamSkyBox, picture);
             Shoot(kerbal.kerbalCamAtmos, picture);
@@ -274,6 +353,31 @@ namespace SmoothPortraits
             Shoot(kerbal.kerbalCam00, picture);
             Shoot(kerbal.kerbalPortraitCamera, picture);
             RenderTexture.active = null;
+        }
+
+        // (the portraits' pictures made over with smoothed edges, once each: the same pictures, which the portraits' panel shows)
+        static readonly HashSet<RenderTexture> sharpened = new HashSet<RenderTexture>();
+
+        /// <summary>
+        /// A portrait's picture made over, once, with four samples a point for smooth edges, and in full colour where the game made it
+        /// sixteen-bit (a kerbal outside: RGB565, which bands). The same picture object is kept, released and made again, so the
+        /// portraits' panel, which shows it, goes on showing it.
+        /// </summary>
+        static void Sharpen(RenderTexture picture)
+        {
+            if (picture == null || sharp == null || !sharp.Value || sharpened.Contains(picture)) return;
+            sharpened.Add(picture);
+            if (sharpened.Count > 64) sharpened.RemoveWhere(t => t == null);
+            try
+            {
+                int samples = QualitySettings.antiAliasing > 1 ? Mathf.Max(QualitySettings.antiAliasing, 4) : 4;
+                if (picture.antiAliasing >= samples && picture.format != RenderTextureFormat.RGB565) return;
+                picture.Release();
+                picture.antiAliasing = samples;
+                if (picture.format == RenderTextureFormat.RGB565) picture.format = RenderTextureFormat.ARGB32;
+                picture.Create();
+            }
+            catch (Exception) { }
         }
 
         static void Shoot(Camera camera, RenderTexture onto)
@@ -368,6 +472,46 @@ namespace SmoothPortraits
                                     ", camera " + (item.crewEVAMember.kerbalPortraitCamera != null) + ", texture " + (item.crewEVAMember.AvatarTexture != null) + ", every " + item.crewEVAMember.KerbalAvatarUpdateInterval + "] ");
                 }
             return text.ToString();
+        }
+
+        static bool testNone;
+
+        /// <summary>For the development build (item 16.3): the cockpit view ("in") or the flight view ("out"), as the game's own keys switch them.</summary>
+        public static string Cockpit(string arg)
+        {
+            if (CameraManager.Instance == null) return "no camera manager";
+            if ((arg ?? "").Trim() == "in") return CameraManager.Instance.SetCameraIVA() ? "in the cockpit" : "the cockpit view would not open";
+            CameraManager.Instance.SetCameraFlight();
+            return "the flight view";
+        }
+
+        /// <summary>For the development build (item 16.5): how the portraits are lit and seen: the inside's sun (the game's IVASun) and every lamp lighting the first portrait's layers, and its camera.</summary>
+        public static string Lit()
+        {
+            foreach (Portraits one in FindObjectsOfType<Portraits>())
+            {
+                if (one.inside.Count == 0) return "no portrait showing";
+                Kerbal kerbal = one.inside[0];
+                ProtoCrewMember member = kerbal.protoCrewMember;
+                Camera camera = member != null && member.seat != null && member.seat.portraitCamera != null ? member.seat.portraitCamera : kerbal.kerbalCam;
+                var text = new System.Text.StringBuilder(camera.name + ": fov " + camera.fieldOfView.ToString("F1") + ", near " + camera.nearClipPlane.ToString("F3") + ", far " + camera.farClipPlane.ToString("F1") + ", mask " + Layers(camera.cullingMask) + ", hdr " + camera.allowHDR + ", " + camera.actualRenderingPath + ", effects:");
+                foreach (Behaviour b in camera.GetComponents<Behaviour>()) text.Append(' ').Append(b.GetType().Name).Append(b.enabled ? "" : "(off)");
+                text.Append(" | ambient ").Append(RenderSettings.ambientMode).Append(' ').Append(RenderSettings.ambientLight.ToString("F2")).Append(", shadows ").Append(QualitySettings.shadows).Append(" to ").Append(QualitySettings.shadowDistance.ToString("F0")).Append(" m");
+                foreach (Light light in FindObjectsOfType<Light>())
+                    if (light.isActiveAndEnabled && (light.cullingMask & camera.cullingMask) != 0)
+                        text.Append(" | ").Append(light.name).Append(light.GetComponent<IVASun>() != null ? " (the inside's sun)" : "").Append(": ").Append(light.type).Append(", intensity ").Append(light.intensity.ToString("F2")).Append(", colour ").Append(light.color.ToString("F2"))
+                            .Append(", shadows ").Append(light.shadows).Append(light.shadows != LightShadows.None ? " " + light.shadowStrength.ToString("F2") : "").Append(", ").Append(light.renderMode).Append(", mask ").Append(Layers(light.cullingMask & camera.cullingMask))
+                            .Append(light.type != LightType.Directional ? ", range " + light.range.ToString("F1") + " at " + Vector3.Distance(light.transform.position, camera.transform.position).ToString("F2") + " m" : ", from " + (-light.transform.forward).ToString("F2"));
+                return text.ToString();
+            }
+            return "not running";
+        }
+
+        /// <summary>For the development build: "none" stops the mod's pictures while it still holds the portraits (the game's own should come back, one each every two seconds); anything else lets them go on.</summary>
+        public static string Hold(string arg)
+        {
+            testNone = (arg ?? "").Trim() == "none";
+            return testNone ? "the mod's pictures stopped, the portraits still held" : "the mod's pictures going on";
         }
 
         static string probed = "not run";
@@ -470,7 +614,13 @@ namespace SmoothPortraits
         /// <summary>For the development build: what it is doing, in a line.</summary>
         public static string Stats()
         {
-            foreach (Portraits one in FindObjectsOfType<Portraits>()) return one.report + " | on " + on.Value + ", at most " + most.Value + ", share " + share.Value + "%, held " + one.held.Count + " + " + one.heldOutside.Count;
+            foreach (Portraits one in FindObjectsOfType<Portraits>())
+                return one.report + " | on " + on.Value + ", at most " + most.Value + ", share " + share.Value + "%, held " + one.held.Count + " + " + one.heldOutside.Count + ", given back to the game " + one.givenBack + " times"
+                       + (ride.Value ? " | ride: " + Ride.Now(one.inside) : "")
+#if DEV
+                       + ", pictures of them taken by others " + othersTook
+#endif
+                       ;
             return "not running (the flight scene only)";
         }
     }

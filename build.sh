@@ -34,14 +34,25 @@ if [ -f src/SmoothPortraits/needs.txt ]; then
   done < src/SmoothPortraits/needs.txt
 fi
 
+# A companion library for the Harmony mod, where this mod has one (src/SmoothPortraitsHarmony): built against this mod and against
+# Harmony, only where Harmony is installed in the game, and loaded by the game only where it is.
+HARMONY="$KSP_DIR/GameData/000_Harmony/0Harmony.dll"
+companion() {  # companion <folder the mod's own library is in>
+  [ -d src/SmoothPortraitsHarmony ] || return 0
+  if [ -f "$HARMONY" ]; then WITH="$KEYSTONE:$1/SmoothPortraits.dll:$HARMONY" compile "$1/SmoothPortraitsHarmony.dll" "" src/SmoothPortraitsHarmony
+  else rm -f "$1/SmoothPortraitsHarmony.dll"; echo "left out: SmoothPortraitsHarmony (Harmony is not installed here to build it against)"; fi
+}
+
 case "$MODE" in
   check)
     WITH="$KEYSTONE" compile "$TMP/SmoothPortraits.dll" "" src/SmoothPortraits
+    companion "$TMP"
     echo "ok: compiles"
     ;;
   dist|install)
     mkdir -p "$OUT"
     WITH="$KEYSTONE" compile "$OUT/SmoothPortraits.dll" "" src/SmoothPortraits
+    companion "$OUT"
     # (the mod's own shaders, if it has any: made by tools/shaderpack/make_bundle.py and kept ready made in src/SmoothPortraits/Shaders)
     if ls src/SmoothPortraits/Shaders/*.bundle >/dev/null 2>&1; then mkdir -p "$OUT/PluginData"; cp src/SmoothPortraits/Shaders/*.bundle "$OUT/PluginData/"; fi
     # (and anything else it keeps in src/SmoothPortraits/PluginData: a craft file, say)
@@ -49,6 +60,8 @@ case "$MODE" in
     if [ "$MODE" = dist ]; then echo "ok: built into $OUT"; exit 0; fi
     mkdir -p "$KSP_DIR/GameData/SmoothPortraits"
     cp "$OUT/SmoothPortraits.dll" "$KSP_DIR/GameData/SmoothPortraits/"
+    rm -f "$KSP_DIR/GameData/SmoothPortraits/SmoothPortraitsHarmony.dll"
+    [ -f "$OUT/SmoothPortraitsHarmony.dll" ] && cp "$OUT/SmoothPortraitsHarmony.dll" "$KSP_DIR/GameData/SmoothPortraits/"
     if [ -d "$OUT/PluginData" ]; then mkdir -p "$KSP_DIR/GameData/SmoothPortraits/PluginData"; cp -R "$OUT/PluginData/." "$KSP_DIR/GameData/SmoothPortraits/PluginData/"; fi
     echo "ok: Smooth Portraits installed to $KSP_DIR/GameData/SmoothPortraits (restart KSP to load it; it needs Keystone there too)"
     ;;
