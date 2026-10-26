@@ -2,7 +2,8 @@
 
 The crew's portraits at the bottom right of the flight screen, drawn as often as the game itself. The game redraws
 them only seven to ten times a second, which is why the faces jerk. From 0.2.0 their edges are smooth too, and the crew's
-heads move with the ride (each can be switched off).
+heads move with the ride (each can be switched off). From 0.3.0 a kerbal killed with their part has their **last moments**
+in their portrait: what the cabin's camera saw of the blow and the fire, until its feed is lost.
 
 ![The crew's portraits at lift-off: the game's own on the left, with Smooth Portraits on the right](src/SmoothPortraits/img/smooth-portraits.gif)
 
@@ -20,17 +21,22 @@ In the Keystone window (the keystone button on the game's toolbar, or Alt-K; Opt
 second (60 as installed), the most of each frame's time the portraits may take (3 %), whether kerbals outside
 the ship are included, and **Smooth edges** (0.2.0, on as installed): the portraits drawn with four samples a point,
 and a kerbal outside the ship in full colour where the game draws sixteen-bit colour, which bands. **Shaken by the ride**
-(0.2.0, on): the crew's heads move with the g and the rumble, as in film from real cockpits.
+(0.2.0, on): the crew's heads move with the g and the rumble, as in film from real cockpits. **Last moments** (0.3.0, on): when
+the game kills a kerbal with their part, their portrait stays for two seconds and shows the cabin's camera catching it: the
+picture thrown about, the blast's flash and the fire's flickering light on their face, the smoke coming down, the picture
+tearing, and the static as the feed is lost. Off: the portrait goes at once, as the game has it.
 
 ## Good to know
 
 * It costs about 0.2 ms a frame for one portrait at 60 pictures a second (measured again on 2026-10-18 with Keystone's meter:
   0.23-0.24 ms of the main thread, the whole frame 0.5-0.9 ms longer), and never more than the share you set:
   where that does not pay for every portrait in every frame, the portraits take turns.
+* The last moments' pictures are taken ahead, a few times a second while a crash is near (about 2 ms a kerbal, at the end of
+  a frame): at a death they cost a few milliseconds.
 
 ## Works on
 
-Mac: tried. Windows 11: 0.1.2 tried; what 0.2.0 adds, not yet. Linux: never run (it is plain C#, with nothing of one
+Mac: tried. Windows 11: 0.1.2 tried; what 0.2.0 and 0.3.0 add, not yet. Linux: never run (it is plain C#, with nothing of one
 system's in it).
 
 **More:** [the long description](https://github.com/IshiakiZ/ksp-smooth-portraits/wiki/The-long-description) (everything in full, and

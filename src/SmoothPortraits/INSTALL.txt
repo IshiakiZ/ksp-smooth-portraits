@@ -3,6 +3,8 @@ for Kerbal Space Program 1.12.x
 
 The crew's portraits at the bottom right of the flight screen, drawn as often as the game itself instead of seven to ten times a second.
 From 0.2.0 with smooth edges, and the crew's heads shaken by the ride (the g and the rumble), as in film from real cockpits.
+From 0.3.0 a kerbal killed with their part has their last moments in their portrait: the cabin's camera catching the blow
+and the fire, the picture tearing, and the static as the feed is lost.
 
 INSTALL
   This mod needs Keystone, the base it stands on, which is a separate download:
@@ -16,10 +18,10 @@ USE
   Open the Keystone window: the keystone button on the game's toolbar, or Option-K on a
   Mac and Alt-K elsewhere. Then turn to Smooth Portraits (it is on as installed): the most
   pictures a second, the share of each frame they may take, kerbals outside the ship, and
-  "Smooth edges" and "Shaken by the ride" (both on as installed).
+  "Smooth edges", "Shaken by the ride" and "Last moments" (all on as installed).
 
 WHERE IT WORKS
-  Made and tried on a Mac; 0.1.2 was tried on Windows 11 too. What 0.2.0 adds has been run
-  on the Mac only so far (it is plain C#). Nobody has run it on Linux yet.
+  Made and tried on a Mac; 0.1.2 was tried on Windows 11 too. What 0.2.0 and 0.3.0 add has
+  been run on the Mac only so far (it is plain C#). Nobody has run it on Linux yet.
 
 Everything else: https://github.com/IshiakiZ/ksp-smooth-portraits

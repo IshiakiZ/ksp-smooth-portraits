@@ -40,10 +40,10 @@ namespace SmoothPortraits
     [KSPAddon(KSPAddon.Startup.Flight, false)]
     public sealed class Portraits : MonoBehaviour
     {
-        public const string Version = "0.2.0";
+        public const string Version = "0.3.0";
 
         static Mod mod;
-        static Toggle on, outside, sharp, ride;
+        static Toggle on, outside, sharp, ride, last;
         static Slider most, share;
 
         // The game's own, which it keeps to itself (see Keystone.Reach).
@@ -80,6 +80,7 @@ namespace SmoothPortraits
                 share = mod.Slider("share", "Share of a frame", 3f, 0.5f, 15f, " %", 1, "How much of each frame's time the portraits may take. Where that is not enough for all of them in every frame, they take turns.");
                 outside = mod.Toggle("outside", "Kerbals outside too", true, "The portrait of a kerbal outside the ship is the whole scene drawn again from their helmet: far dearer. Off leaves those to the game.");
                 ride = mod.Toggle("ride", "Shaken by the ride", true, "The crew's heads move in their portraits as the ride moves them, as in film from real cockpits: pressed back under thrust and nodding forward when it stops, swaying in turns, buzzing with solid boosters, the air's buffeting near the speed of sound and rough ground. The game moves only their faces. Off: as the game draws them.");
+                last = mod.Toggle("last", "Last moments", true, "(0.3.0) When a kerbal is killed with their part, their portrait stays a moment and shows what the cabin's camera saw: the blow throwing the picture about, the flash and the fire's light, then the picture tearing and the feed lost. Off: the portrait goes at once, as the game has it.");
                 sharp = mod.Toggle("sharp", "Smooth edges", true, "The portraits drawn with their edges smoothed (four samples a point), and a kerbal outside the ship in full colour (the game draws those in sixteen-bit colour, which bands): a little more of the graphics card's time for each picture. Off: as the game draws them.");
             }
         }
@@ -88,6 +89,7 @@ namespace SmoothPortraits
         {
             Setup();
             mod.Panel = Readout;
+            LastMoments.Setting = last;
             if (!looked)
             {
                 looked = true;
@@ -128,6 +130,7 @@ namespace SmoothPortraits
 
         void OnDestroy()
         {
+            LastMoments.Unhook();
             Ride.Upright();
             LetGo();
             if (mod != null && mod.Panel == Readout) mod.Panel = null;
@@ -145,6 +148,7 @@ namespace SmoothPortraits
         void LateUpdate()
         {
             if (!Able) return;
+            LastMoments.Step();
             if (!on.Value) { if (held.Count > 0 || heldOutside.Count > 0) LetGo(); report = "off"; return; }
             KerbalPortraitGallery gallery = KerbalPortraitGallery.Instance;
             if (gallery == null || !gallery.isActiveAndEnabled) return;
@@ -223,6 +227,9 @@ namespace SmoothPortraits
                 yield return finished;
                 try { Pictures(); }
                 catch (Exception ex) { Kit.Log("Smooth Portraits", "stopped for this frame: " + ex.Message); }
+                // (and, while a crash may be near, the crew's last pictures taken ahead: see LastMoments.Prepare)
+                try { if (Able) LastMoments.Prepare(); }
+                catch (Exception ex) { Kit.Log("Smooth Portraits", "last pictures not taken ahead: " + ex.Message); }
                 finally { Ride.Upright(); }
             }
         }
@@ -295,6 +302,7 @@ namespace SmoothPortraits
                 if (heldOutside.ContainsKey(walker)) heldOutside[walker] = Time.unscaledTime;
             };
             StartCoroutine(AfterEachFrame());
+            if (Able) { LastMoments.Hook(); StartCoroutine(LastMoments.Watch()); StartCoroutine(LastMoments.WarmUp()); }
         }
 
         /// <summary>
@@ -329,6 +337,20 @@ namespace SmoothPortraits
             }
             return taken;
         }
+
+        /// <summary>(For LastMoments.) The gallery's portraits, as it keeps them.</summary>
+        internal static List<KerbalPortrait> Crew(KerbalPortraitGallery gallery) => gallery != null && crewList != null ? crewList.GetValue(gallery) as List<KerbalPortrait> : null;
+
+        /// <summary>(For LastMoments.) Whether a portrait is showing (not scrolled out of the gallery's view).</summary>
+        internal static bool Showing(KerbalPortrait portrait)
+        {
+            if (portrait == null || portrait.portrait == null || !portrait.portrait.enabled) return false;
+            if (portrait.crewMember != null) return seen != null && (bool)seen.GetValue(portrait.crewMember);
+            return portrait.crewEVAMember != null && (seenOutside == null || (bool)seenOutside.GetValue(portrait.crewEVAMember));
+        }
+
+        /// <summary>(For LastMoments.) A picture of a kerbal inside, the game's own way, into their portrait's texture.</summary>
+        internal static void Picture(Kerbal kerbal) { if (drawFromSeat != null && draw != null) Draw(kerbal); }
 
         /// <summary>One portrait's picture, the way the game's own timer has it taken (see Kerbal.kerbalAvatarUpdateCycle).</summary>
         static void Draw(Kerbal kerbal)

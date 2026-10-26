@@ -135,6 +135,9 @@ namespace SmoothPortraits
             return h;
         }
 
+        /// <summary>(Since 0.3.0, for LastMoments.) The bone a kerbal's head turns on.</summary>
+        internal static Transform NeckOf(Kerbal k) => k == null ? null : heads.TryGetValue(k, out Head h) ? h.bone : Neck(k.transform);
+
         /// <summary>The bone the head turns on: the neck's, by its name in the kerbal's model (the highest one so named), or the head's.</summary>
         static Transform Neck(Transform root)
         {
