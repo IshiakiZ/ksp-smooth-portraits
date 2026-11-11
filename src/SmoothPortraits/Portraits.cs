@@ -8,7 +8,7 @@ using UnityEngine;
 
 #if !DEV
 [assembly: KSPAssembly("SmoothPortraits", 0, 1)]
-[assembly: KSPAssemblyDependency("Keystone", 0, 4)]
+[assembly: KSPAssemblyDependency("Keystone", 0, 11)]
 #endif
 
 namespace SmoothPortraits
@@ -40,11 +40,20 @@ namespace SmoothPortraits
     [KSPAddon(KSPAddon.Startup.Flight, false)]
     public sealed class Portraits : MonoBehaviour
     {
-        public const string Version = "0.3.0";
+        public const string Version = "0.4.0";
 
         static Mod mod;
         static Toggle on, outside, sharp, ride, last;
         static Slider most, share;
+        // (the page's fine details, in its Advanced view: each as installed does what the mod did before it had them)
+        internal static Slider leanBy, buzzBy, shakeBy;
+        internal static float Of(Slider slider, float installed) => slider != null ? (float)slider : installed;
+
+        /// <summary>The settings added after Fine(true) are fine details: on the page only in Keystone's Advanced view, until Fine(false).
+        /// (Keystone 0.11.0 has the two views; an older one has neither call, and shows the fine details with the rest.)</summary>
+        static void Fine(bool fine) { try { if (fine) Advanced(mod); else Simple(mod); } catch (Exception) { } }
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)] static void Advanced(Mod page) => page.Advanced();
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)] static void Simple(Mod page) => page.Simple();
 
         // The game's own, which it keeps to itself (see Keystone.Reach).
         static bool looked;
@@ -80,6 +89,11 @@ namespace SmoothPortraits
                 share = mod.Slider("share", "Share of a frame", 3f, 0.5f, 15f, " %", 1, "How much of each frame's time the portraits may take. Where that is not enough for all of them in every frame, they take turns.");
                 outside = mod.Toggle("outside", "Kerbals outside too", true, "The portrait of a kerbal outside the ship is the whole scene drawn again from their helmet: far dearer. Off leaves those to the game.");
                 ride = mod.Toggle("ride", "Shaken by the ride", true, "The crew's heads move in their portraits as the ride moves them, as in film from real cockpits: pressed back under thrust and nodding forward when it stops, swaying in turns, buzzing with solid boosters, the air's buffeting near the speed of sound and rough ground. The game moves only their faces. Off: as the game draws them.");
+                Fine(true);
+                leanBy = mod.Slider("lean", "How far heads lean", 1f, 0f, 3f, "x", 2, "How far the crew's heads lean with the ride's pushes (back into the headrest no further than it gives, forward no further than the straps let).");
+                buzzBy = mod.Slider("buzz", "How much heads buzz", 1f, 0f, 3f, "x", 2, "How much the crew's heads buzz as the craft does under power.");
+                shakeBy = mod.Slider("mountshake", "The portrait's camera shaken", 1f, 0f, 3f, "x", 2, "How much the camera taking each portrait shakes on its mount with the buzz.");
+                Fine(false);
                 last = mod.Toggle("last", "Last moments", true, "(0.3.0) When a kerbal is killed with their part, their portrait stays a moment and shows what the cabin's camera saw: the blow throwing the picture about, the flash and the fire's light, then the picture tearing and the feed lost. Off: the portrait goes at once, as the game has it.");
                 sharp = mod.Toggle("sharp", "Smooth edges", true, "The portraits drawn with their edges smoothed (four samples a point), and a kerbal outside the ship in full colour (the game draws those in sixteen-bit colour, which bands): a little more of the graphics card's time for each picture. Off: as the game draws them.");
             }
@@ -132,6 +146,7 @@ namespace SmoothPortraits
         {
             LastMoments.Unhook();
             Ride.Upright();
+            Ride.Hook(false);
             LetGo();
             if (mod != null && mod.Panel == Readout) mod.Panel = null;
         }
@@ -149,6 +164,12 @@ namespace SmoothPortraits
         {
             if (!Able) return;
             LastMoments.Step();
+            // (the heads leant in the game's own pictures of the portraits too, while the ride leans them in this mod's: see Ride.Hook)
+#if DEV
+            Ride.Hook(on.Value && ride.Value && !testUprightInTheirs);
+#else
+            Ride.Hook(on.Value && ride.Value);
+#endif
             if (!on.Value) { if (held.Count > 0 || heldOutside.Count > 0) LetGo(); report = "off"; return; }
             KerbalPortraitGallery gallery = KerbalPortraitGallery.Instance;
             if (gallery == null || !gallery.isActiveAndEnabled) return;
@@ -172,6 +193,9 @@ namespace SmoothPortraits
                         {
                             inside.Add(kerbal);
                             if (!held.TryGetValue(kerbal, out float drawn)) held[kerbal] = drawn = now;
+#if DEV
+                            if (testBoth) { Resume(kerbal, timer, cycle, seen); continue; }
+#endif
                             if (now - drawn < 1f) Halt(kerbal, timer);
                             else if (Resume(kerbal, timer, cycle, seen)) givenBack++;
                             continue;
@@ -203,6 +227,9 @@ namespace SmoothPortraits
             // (the heads leant by the ride here, after the faces' animation and before Unity makes their skin for this frame, and put
             // back at its end: see Ride)
             if (ride.Value && inside.Count > 0) { Ride.Step(inside, Time.deltaTime); Ride.TurnHeads(inside); }
+#if DEV
+            Watch();
+#endif
         }
 
 #if DEV
@@ -210,7 +237,54 @@ namespace SmoothPortraits
         static readonly HashSet<Camera> theirs = new HashSet<Camera>();
         static bool counting, ours;
         static int othersTook;
-        static void Counted(Camera cam) { if (!ours && cam != null && theirs.Contains(cam)) othersTook++; }
+        static void Counted(Camera cam)
+        {
+            if (ours || cam == null || !theirs.Contains(cam)) return;
+            othersTook++;
+            Note("theirs " + cam.name + " < " + Caller());
+        }
+
+        // (and what happened around them, frame by frame, for Others: each portrait's showing and the game's timer for it going or not, and
+        // this mod's own slow pictures and frames without any)
+        static readonly List<string> notes = new List<string>();
+        readonly Dictionary<Kerbal, int> watched = new Dictionary<Kerbal, int>();
+        static void Note(string what) { if (notes.Count < 400) notes.Add("f" + Time.frameCount + " " + Time.unscaledTime.ToString("F3") + " " + what); }
+
+        static string Caller()
+        {
+            var said = new System.Text.StringBuilder();
+            System.Diagnostics.StackFrame[] frames = new StackTrace(2, false).GetFrames() ?? new System.Diagnostics.StackFrame[0];
+            int n = 0;
+            foreach (System.Diagnostics.StackFrame f in frames)
+            {
+                System.Reflection.MethodBase m = f.GetMethod();
+                if (m == null) continue;
+                if (n++ > 0) said.Append(" < ");
+                said.Append(m.DeclaringType != null ? m.DeclaringType.Name + "." : "").Append(m.Name);
+                if (n >= 9) break;
+            }
+            return said.ToString();
+        }
+
+        void Watch()
+        {
+            foreach (Kerbal k in held.Keys)
+            {
+                if (k == null) continue;
+                int now = ((bool)seen.GetValue(k) ? 1 : 0) + (timer.GetValue(k) != null ? 2 : 0);
+                if (watched.TryGetValue(k, out int was) && was == now) continue;
+                watched[k] = now;
+                Note(k.crewMemberName + ": showing " + ((now & 1) != 0) + ", the game's timer " + ((now & 2) != 0 ? "going" : "stopped"));
+            }
+        }
+
+        /// <summary>For the development build: the notes since the last call (pictures of the portraits taken by others, and by whom; each portrait's showing and timer as they change; this mod's slow pictures and frames without any), and cleared.</summary>
+        public static string Others()
+        {
+            string said = othersTook + " taken by others; " + string.Join("\n", notes.ToArray());
+            notes.Clear();
+            return said;
+        }
 #endif
 
         /// <summary>
@@ -225,8 +299,16 @@ namespace SmoothPortraits
             while (true)
             {
                 yield return finished;
+#if DEV
+                Ride.Check(0);
+                Ride.Seen("by the frame's end, before this mod's pictures", null);
+#endif
                 try { Pictures(); }
                 catch (Exception ex) { Kit.Log("Smooth Portraits", "stopped for this frame: " + ex.Message); }
+#if DEV
+                Ride.Check(1);
+                Ride.Seen("after this mod's pictures", null);
+#endif
                 // (and, while a crash may be near, the crew's last pictures taken ahead: see LastMoments.Prepare)
                 try { if (Able) LastMoments.Prepare(); }
                 catch (Exception ex) { Kit.Log("Smooth Portraits", "last pictures not taken ahead: " + ex.Message); }
@@ -251,6 +333,9 @@ namespace SmoothPortraits
             // whatever reads the screen at the end of a frame, a screenshot say, would get a portrait instead.)
             RenderTexture before = RenderTexture.active;
             int taken = Take(inside.Count, ref credit, ref turn, ref saved, each, frame, drawInside, ref costInside);
+#if DEV
+            if (taken < inside.Count) Note("ours " + taken + " of " + inside.Count + ": saved " + (saved * 1000.0).ToString("F2") + " ms, a picture costing " + (costInside * 1000.0).ToString("F2"));
+#endif
             int takenOutside = Take(out_.Count, ref creditOutside, ref turnOutside, ref savedOutside, each, frame, drawOutside, ref costOutside);
             if (taken + takenOutside > 0) RenderTexture.active = before;
 
@@ -277,12 +362,14 @@ namespace SmoothPortraits
                 Kerbal kerbal = inside[n];
                 bool shaken = ride.Value;
                 if (shaken) Ride.ShakeCamera(kerbal);
+                Ride.Taking(kerbal);
 #if DEV
                 ours = true;
 #endif
                 try { Draw(kerbal); }
                 finally
                 {
+                    Ride.Taken();
                     if (shaken) Ride.StillCamera(kerbal);
 #if DEV
                     ours = false;
@@ -329,6 +416,9 @@ namespace SmoothPortraits
                 try { picture(turn % count); }
                 catch (Exception ex) { Kit.Log("Smooth Portraits", "a portrait could not be drawn: " + ex.Message); }
                 double took = (Stopwatch.GetTimestamp() - began) / (double)Stopwatch.Frequency;
+#if DEV
+                if (took > 0.0015) Note("ours slow: " + (took * 1000.0).ToString("F2") + " ms, the picture before costing " + (cost * 1000.0).ToString("F2"));
+#endif
                 cost += (took - cost) * 0.05;
                 turn = (turn + 1) % count;
                 credit -= 1f;
@@ -496,7 +586,30 @@ namespace SmoothPortraits
             return text.ToString();
         }
 
-        static bool testNone;
+        static bool testNone, testBoth, testUprightInTheirs;
+
+        /// <summary>For the development build: the ride's heads (their bones, cameras and skins, and the other pictures they were leant for and not; see Ride.Heads).</summary>
+        public static string Heads() => Ride.Heads();
+
+        /// <summary>For the development build: Who("start"), then Who("") a few seconds later: where the turned heads were found turned back (each camera's hooks called one by one; see Ride.Who).</summary>
+        public static string Who(string arg) => Ride.Who((arg ?? "").Trim());
+
+        /// <summary>For the development build: the crew's animators animating whether seen or not ("always"), or as the game had them ("").</summary>
+        public static string Culling(string arg) => Ride.Culling((arg ?? "").Trim());
+
+        /// <summary>For the development build: "off" leaves a turned head that something turned back as it was left for its picture (as before); anything else turns it again (see Ride.Again).</summary>
+        public static string Again(string arg)
+        {
+            Ride.TestNoAgain = (arg ?? "").Trim() == "off";
+            return Ride.TestNoAgain ? "heads turned back left so for their pictures, as before" : "heads turned back turned again before their pictures";
+        }
+
+        /// <summary>For the development build: "upright" leaves the heads as the game has them in the game's own pictures of the portraits (as before 2026-10-28); anything else leans them there too.</summary>
+        public static string Theirs(string arg)
+        {
+            testUprightInTheirs = (arg ?? "").Trim() == "upright";
+            return testUprightInTheirs ? "the game's own pictures with the heads upright, as before" : "the game's own pictures with the heads leant by the ride";
+        }
 
         /// <summary>For the development build (item 16.3): the cockpit view ("in") or the flight view ("out"), as the game's own keys switch them.</summary>
         public static string Cockpit(string arg)
@@ -529,11 +642,13 @@ namespace SmoothPortraits
             return "not running";
         }
 
-        /// <summary>For the development build: "none" stops the mod's pictures while it still holds the portraits (the game's own should come back, one each every two seconds); anything else lets them go on.</summary>
+        /// <summary>For the development build: "none" stops the mod's pictures while it still holds the portraits (the game's own come back after a second, at the game's pace: 52 of two portraits in 3.1 s on the PC, 2026-10-28); "both" lets them go on with the game's own timer kept going beside them, as when it is started again in the middle of this mod's pictures; anything else lets them go on alone.</summary>
         public static string Hold(string arg)
         {
-            testNone = (arg ?? "").Trim() == "none";
-            return testNone ? "the mod's pictures stopped, the portraits still held" : "the mod's pictures going on";
+            string how = (arg ?? "").Trim();
+            testNone = how == "none";
+            testBoth = how == "both";
+            return testNone ? "the mod's pictures stopped, the portraits still held" : testBoth ? "the mod's pictures going on, and the game's own beside them" : "the mod's pictures going on";
         }
 
         static string probed = "not run";

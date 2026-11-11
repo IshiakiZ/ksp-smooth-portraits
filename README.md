@@ -21,7 +21,8 @@ In the Keystone window (the keystone button on the game's toolbar, or Alt-K; Opt
 second (60 as installed), the most of each frame's time the portraits may take (3 %), whether kerbals outside
 the ship are included, and **Smooth edges** (0.2.0, on as installed): the portraits drawn with four samples a point,
 and a kerbal outside the ship in full colour where the game draws sixteen-bit colour, which bands. **Shaken by the ride**
-(0.2.0, on): the crew's heads move with the g and the rumble, as in film from real cockpits. **Last moments** (0.3.0, on): when
+(0.2.0, on): the crew's heads move with the g and the rumble, as in film from real cockpits (with Keystone 0.11.0, how far
+they lean, how much they buzz and how much the portrait's camera shakes are finer details in its Advanced view). **Last moments** (0.3.0, on): when
 the game kills a kerbal with their part, their portrait stays for two seconds and shows the cabin's camera catching it: the
 picture thrown about, the blast's flash and the fire's flickering light on their face, the smoke coming down, the picture
 tearing, and the static as the feed is lost. Off: the portrait goes at once, as the game has it.
